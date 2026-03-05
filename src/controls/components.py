@@ -10,8 +10,8 @@ class CardInfo(ft.Container):
         self.alignment=ft.Alignment.TOP_LEFT
         self.padding=ft.Padding.only(left=10, top=10)
         self.valor_total = ft.Text(f"Total: {valor_total}", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_300)
-        self.valor_online = ft.Text(f"On: {valor_online}", size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_300)
-        self.valor_offline = ft.Text(f"Off: {valor_offline}", size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_300)
+        self.valor_online = ft.Text(f"ON: {valor_online}", size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_300)
+        self.valor_offline = ft.Text(f"OFF: {valor_offline}", size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_300)
         
         self.content = ft.Column(
             controls=[
@@ -128,7 +128,7 @@ class CardHardware(ft.Container):
         )
 
         self.content = ft.Card(
-            expand=True,
+            expand=3,
             content=self.layout
         )
 
@@ -140,7 +140,7 @@ class CardHardware(ft.Container):
             
         self.facial.load_info()
         
-        # Atualizar UI
+        # Atualizar UI individual do card
         if self.facial.online:
             self.status_icon.icon = ft.Icons.ONLINE_PREDICTION_OUTLINED
             self.status_icon.color = ft.Colors.GREEN_300
@@ -162,6 +162,11 @@ class CardHardware(ft.Container):
 
         try:
             self.update()
+            
+            # Notificar o pai (TabelaHardwares) para atualizar as estatísticas globais
+            if hasattr(self, "parent") and self.parent:
+                if hasattr(self.parent, "refresh_stats"):
+                    self.parent.refresh_stats()
         except Exception:
             pass
 
@@ -186,40 +191,101 @@ class CardHardware(ft.Container):
 class TabelaHardwares(ft.Column):
     def __init__(self, hardwares:list[CardHardware]):
         super().__init__()
-        self.hardwares = hardwares
-        self.online = 0
-        self.offline = 0
+        self.hardwares:list[CardHardware] = hardwares
+        self.card_info = None # Referência que será ligada no main.py
 
         self.expand=True
         self.scroll=ft.ScrollMode.AUTO
 
-        self.controls = hardwares
+        # Controle para exibir quando a busca for vazia
+        self.empty_result = ft.Container(
+            content=ft.Column(
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Icon(ft.Icons.SEARCH_OFF_ROUNDED, size=50, color=ft.Colors.GREY_400),
+                    ft.Text("Nenhum equipamento encontrado", color=ft.Colors.GREY_400)
+                ]
+            ),
+            padding=50,
+            visible=False
+        )
+
+        self.controls = [self.empty_result] + hardwares
 
         self.__reverse = True
 
-    def update_status(self):
-        self.online = 0
-        self.offline = 0
-        for hardware in self.hardwares:
-            hardware._load_async_data()
+    def refresh_stats(self):
+        """ Recalcula ON/OFF via len() e atualiza o CardInfo se ligado """
+        if self.card_info:
+            online_count = len([h for h in self.hardwares if h.facial.online])
+            offline_count = len([h for h in self.hardwares if not h.facial.online])
+            
+            self.card_info.valor_online.value = f"ON: {online_count}"
+            self.card_info.valor_offline.value = f"OFF: {offline_count}"
+            self.card_info.update()
 
-            if hardware.facial.online:
-                self.page.data.online += 1
-            else:
-                self.page.data.offline += 1
+    def update_status(self, card_info):
+        """ Atualiza todos os hardwares e vincula o card_info """
+        self.card_info = card_info
+        
+        for hardware in self.hardwares:
+            # Reseta o ícone visual para "carregando"
+            hardware.status_icon.icon = ft.Icons.DOWNLOADING_OUTLINED
+            hardware.status_icon.color = ft.Colors.BLUE_300
+            try: hardware.update()
+            except: pass
+            
+            # Dispara a carga em nova thread
+            threading.Thread(target=hardware._load_async_data, daemon=True).start()
     
+    def sort_by(self, attr_return:str):
+        """ Ordena a lista de hardwares por qualquer atributo do objeto facial """
+        self.hardwares.sort(key=lambda x: getattr(x.facial, attr_return) if getattr(x.facial, attr_return) is not None else "", reverse=self.__reverse)
+        self.controls = [self.empty_result] + self.hardwares
+        self.__reverse = not self.__reverse
+        self.update()
+
     def sort_by_nome(self):
-        self.controls.sort(key=lambda x: x.facial.nome_db)
+        """ Ordena especificamente por nome_db """
+        self.hardwares.sort(key=lambda x: x.facial.nome_db.lower() if x.facial.nome_db else "")
+        self.controls = [self.empty_result] + self.hardwares
         self.update()
 
     def sort_by_pessoas(self):
-        self.controls.sort(key=lambda x: x.facial.pessoas, reverse=self.__reverse)
+        """ Ordena especificamente por quantidade de pessoas """
+        self.hardwares.sort(key=lambda x: int(x.facial.pessoas) if x.facial.pessoas is not None else 0, reverse=self.__reverse)
+        self.controls = [self.empty_result] + self.hardwares
         self.__reverse = not self.__reverse
         self.update()
 
     def filter_search(self, search_text):
-        """Filtra o os equipamentos por nome, mac e ip"""
-        self.controls = [hardware for hardware in self.hardwares if search_text.lower() in hardware.facial.nome_db.lower() or search_text.lower() in hardware.facial.mac_address.lower() or search_text.lower() in hardware.facial.ip.lower()]
+        """Filtra os equipamentos por nome, mac e ip de forma otimizada"""
+        search_text = search_text.lower().strip()
+        
+        # Se a busca estiver vazia, mostra todos e esconde o aviso de vazio
+        if not search_text:
+            self.empty_result.visible = False
+            for h in self.hardwares:
+                h.visible = True
+            self.update()
+            return
+
+        algum_visivel = False
+        for hardware in self.hardwares:
+            # String de busca segura tratando Nones
+            nome = (hardware.facial.nome_db or "").lower()
+            ip = (hardware.facial.ip or "").lower()
+            mac = (hardware.facial.mac_address or "").lower()
+            
+            # Verifica se o termo está em algum dos campos
+            if search_text in nome or search_text in ip or search_text in mac:
+                hardware.visible = True
+                algum_visivel = True
+            else:
+                hardware.visible = False
+        
+        # Exibe aviso se nenhum resultado for encontrado
+        self.empty_result.visible = not algum_visivel
         self.update()
 
 

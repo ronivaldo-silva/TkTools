@@ -503,107 +503,7 @@ class HikvisionClient:
             logging.error(f"Erro ao reiniciar o dispositivo {self.ip}: {e}")
             raise e
 
-    def config_http_host(self, server_ip: str, endpoint: str, host_id: int = 1, port: int = 8080, heartbeat_interval: int = 30):
-        """
-        Configura o equipamento para enviar requisições de eventos e heartbeats para o servidor (Listening Mode).
-        :param server_ip: IP do servidor que vai escutar os eventos.
-        :param endpoint: A rota (URI) da API/Servidor que vai receber o POST (ex: /api/eventos).
-        :param host_id: O número do Host ID (de 1 a 10). Padrão é 1.
-        :param port: A porta do servidor. Padrão é 8080.
-        :param heartbeat_interval: Intervalo em segundos para envio do pulso de vida. Padrão é 30.
-        """
-        url_endpoint = f"/ISAPI/Event/notification/httpHosts/{host_id}?format=json"
-        
-        payload = {
-            "HttpHostNotification": {
-                "id": str(host_id),
-                "url": endpoint, 
-                "protocolType": "HTTP",
-                "parameterFormatType": "JSON",
-                "addressingFormatType": "ipaddress",
-                "ipAddress": server_ip,
-                "portNo": port,
-                "httpAuthenticationMethod": "none",
-                "enabled": True,
-                "SubscribeEvent": {
-                    "heartbeat": heartbeat_interval,
-                    "eventMode": "all"
-                }
-            }
-        }
-        
-        try:
-            response = self._put_request(url_endpoint, json_data=payload)
-            # A resposta pode ser vazia dependendo da versão do firmware, mas normalmente retorna status 200 OK
-            if response.content:
-                try:
-                    return response.json()
-                except:
-                    pass
-            return {"status": "OK", "message": f"Heartbeat configurado com sucesso para {server_ip}:{port}{endpoint}"}
-        except Exception as e:
-            logging.error(f"Erro ao configurar heartbeat no dispositivo {self.ip}: {e}")
-            raise e
-
-    def get_http_hosts(self, host_id: int = None):
-        """
-        Coleta os httpHosts (servidores de escuta/recebimento de eventos) cadastrados no equipamento usando XML.
-        
-        :param host_id: (Opcional) ID específico do host (1 a 10). Se None, retorna todos os hosts.
-        :return: Uma lista de dicionários (se host_id for None) ou um único dicionário (se ID especificado) no formato:
-            {
-                "id": str,
-                "url": str,
-                "protocolType": str,
-                "parameterFormatType": str,
-                "addressingFormatType": str,
-                "ipAddress": str,
-                "portNo": str,
-                "httpAuthenticationMethod": str
-            }
-        """
-        if host_id is not None:
-            endpoint = f"/ISAPI/Event/notification/httpHosts/{host_id}"
-        else:
-            endpoint = "/ISAPI/Event/notification/httpHosts"
-
-        try:
-            response = self._get_request(endpoint)
-            content = response.text
-            
-            # Limpeza de namespaces para facilitar o parser com ET
-            import re
-            content_cleaned = re.sub(r' xmlns="[^"]+"', '', content, count=1)
-            content_cleaned = re.sub(r' xmlns:[a-zA-Z0-9]+="[^"]+"', '', content_cleaned)
-            
-            root = ET.fromstring(content_cleaned)
-            
-            def parse_host_node(node):
-                return {
-                    "id": getattr(node.find('id'), 'text', ''),
-                    "url": getattr(node.find('url'), 'text', ''),
-                    "protocolType": getattr(node.find('protocolType'), 'text', ''),
-                    "parameterFormatType": getattr(node.find('parameterFormatType'), 'text', ''),
-                    "addressingFormatType": getattr(node.find('addressingFormatType'), 'text', ''),
-                    "ipAddress": getattr(node.find('ipAddress'), 'text', ''),
-                    "portNo": getattr(node.find('portNo'), 'text', ''),
-                    "httpAuthenticationMethod": getattr(node.find('httpAuthenticationMethod'), 'text', '')
-                }
-
-            if root.tag == "HttpHostNotificationList":
-                hosts = []
-                for child in root.findall('HttpHostNotification'):
-                     hosts.append(parse_host_node(child))
-                return hosts
-            elif root.tag == "HttpHostNotification":
-                return parse_host_node(root)
-            else:
-                return {"status": "error", "message": f"Tag raiz desconhecida: {root.tag}", "raw": content}
-
-        except Exception as e:
-            logging.error(f"Erro ao obter http hosts do dispositivo {self.ip}: {e}")
-            raise e
-
+    # Trabalhos com HTTP Hosts configuração de envio de eventos para servidor
     def get_http_host_capabilities(self, host_type: str = None):
         """
         Obtem as capacidades de configuração dos servidores de escuta (Listening Hosts).
@@ -673,4 +573,105 @@ class HikvisionClient:
 
         except Exception as e:
             logging.error(f"Erro ao obter capacidades de http hosts do dispositivo {self.ip}: {e}")
+            raise e
+
+    def get_http_hosts(self, host_id: int = None):
+        """
+        Coleta os httpHosts (servidores de escuta/recebimento de eventos) cadastrados no equipamento usando XML.
+        
+        :param host_id: (Opcional) ID específico do host (1 a 10). Se None, retorna todos os hosts.
+        :return: Uma lista de dicionários (se host_id for None) ou um único dicionário (se ID especificado) no formato:
+            {
+                "id": str,
+                "url": str,
+                "protocolType": str,
+                "parameterFormatType": str,
+                "addressingFormatType": str,
+                "ipAddress": str,
+                "portNo": str,
+                "httpAuthenticationMethod": str
+            }
+        """
+        if host_id is not None:
+            endpoint = f"/ISAPI/Event/notification/httpHosts/{host_id}"
+        else:
+            endpoint = "/ISAPI/Event/notification/httpHosts"
+
+        try:
+            response = self._get_request(endpoint)
+            content = response.text
+            
+            # Limpeza de namespaces para facilitar o parser com ET
+            import re
+            content_cleaned = re.sub(r' xmlns="[^"]+"', '', content, count=1)
+            content_cleaned = re.sub(r' xmlns:[a-zA-Z0-9]+="[^"]+"', '', content_cleaned)
+            
+            root = ET.fromstring(content_cleaned)
+            
+            def parse_host_node(node):
+                return {
+                    "id": getattr(node.find('id'), 'text', ''),
+                    "url": getattr(node.find('url'), 'text', ''),
+                    "protocolType": getattr(node.find('protocolType'), 'text', ''),
+                    "parameterFormatType": getattr(node.find('parameterFormatType'), 'text', ''),
+                    "addressingFormatType": getattr(node.find('addressingFormatType'), 'text', ''),
+                    "ipAddress": getattr(node.find('ipAddress'), 'text', ''),
+                    "portNo": getattr(node.find('portNo'), 'text', ''),
+                    "httpAuthenticationMethod": getattr(node.find('httpAuthenticationMethod'), 'text', '')
+                }
+
+            if root.tag == "HttpHostNotificationList":
+                hosts = []
+                for child in root.findall('HttpHostNotification'):
+                     hosts.append(parse_host_node(child))
+                return hosts
+            elif root.tag == "HttpHostNotification":
+                return parse_host_node(root)
+            else:
+                return {"status": "error", "message": f"Tag raiz desconhecida: {root.tag}", "raw": content}
+
+        except Exception as e:
+            logging.error(f"Erro ao obter http hosts do dispositivo {self.ip}: {e}")
+            raise e
+
+    def config_http_host(self, server_ip: str, endpoint: str, host_id: int = 1, port: int = 8080, heartbeat_interval: int = 30):
+        """
+        Configura o equipamento para enviar requisições de eventos e heartbeats para o servidor (Listening Mode).
+        :param server_ip: IP do servidor que vai escutar os eventos.
+        :param endpoint: A rota (URI) da API/Servidor que vai receber o POST (ex: /api/eventos).
+        :param host_id: O número do Host ID (de 1 a 10). Padrão é 1.
+        :param port: A porta do servidor. Padrão é 8080.
+        :param heartbeat_interval: Intervalo em segundos para envio do pulso de vida. Padrão é 30.
+        """
+        url_endpoint = f"/ISAPI/Event/notification/httpHosts/{host_id}?format=json"
+        
+        payload = {
+            "HttpHostNotification": {
+                "id": str(host_id),
+                "url": endpoint, 
+                "protocolType": "HTTP",
+                "parameterFormatType": "JSON",
+                "addressingFormatType": "ipaddress",
+                "ipAddress": server_ip,
+                "portNo": port,
+                "httpAuthenticationMethod": "none",
+                "enabled": True,
+                "SubscribeEvent": {
+                    "heartbeat": heartbeat_interval,
+                    "eventMode": "all"
+                }
+            }
+        }
+        
+        try:
+            response = self._put_request(url_endpoint, json_data=payload)
+            # A resposta pode ser vazia dependendo da versão do firmware, mas normalmente retorna status 200 OK
+            if response.content:
+                try:
+                    return response.json()
+                except:
+                    pass
+            return {"status": "OK", "message": f"Heartbeat configurado com sucesso para {server_ip}:{port}{endpoint}"}
+        except Exception as e:
+            logging.error(f"Erro ao configurar heartbeat no dispositivo {self.ip}: {e}")
             raise e

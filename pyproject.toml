@@ -1,11 +1,11 @@
 [project]
-name = "newrecep"
+name = "TkTools"
 version = "0.1.0"
 description = ""
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    { name = "Flet developer", email = "you@example.com" }
+    { name = "Ronivaldo Silva", email = "ronivaldo.alpha@gmail.com" }
 ]
 dependencies = [
     "flet>=0.81.0"
@@ -20,7 +20,7 @@ dev = [
 
 [tool.flet]
 org = "com.mycompany"
-product = "newrecep"
+product = "TkTools"
 company = "Flet"
 copyright = "Copyright (C) 2023-2026 by Flet"
 

@@ -14,10 +14,7 @@ def main(page: ft.Page):
     page.window.width = 400
     page.window.height = 750
 
-    page.data = {
-        "online": 0,
-        "offline": 0
-    }
+    page.data = {} # Limpando dados antigos não utilizados
 
     header_text = ft.Container(
         content=ft.Text("Hardware Dashboard", size=20, weight=ft.FontWeight.BOLD),
@@ -44,7 +41,14 @@ def main(page: ft.Page):
 
     list_hardware = TabelaHardwares([ CardHardware(facial["Nome"], facial["IP"], pessoas=0) for facial in faciais_dict])
 
-    card_info = CardInfo(valor_total=len(faciais_db), valor_online=page.data["online"], valor_offline=page.data["offline"])
+    card_info = CardInfo(
+        valor_total=len(faciais_db), 
+        valor_online=0, 
+        valor_offline=0
+    )
+
+    # Vincula o card_info a tabela para que as atualizações automáticas funcionem
+    list_hardware.card_info = card_info
 
     bt_sort_pessoas = ft.Button(
         content=ft.Text("Sort by Pessoas"),
@@ -57,7 +61,14 @@ def main(page: ft.Page):
     )
 
     bt_sort_row = ft.Row(
-        controls=[bt_sort_pessoas, bt_sort_nome]
+        controls=[
+            bt_sort_pessoas, 
+            bt_sort_nome,
+            ft.IconButton(
+                icon=ft.Icons.REFRESH,
+                on_click=lambda e: list_hardware.update_status(card_info)
+            )
+        ]
     )
 
     search = ft.TextField(
@@ -78,4 +89,4 @@ def main(page: ft.Page):
     page.add(view_home)
 
 if __name__ == "__main__":
-    ft.run(main=main)
+    ft.run(main=main, assets_dir="assets")
