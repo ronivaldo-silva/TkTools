@@ -1,6 +1,6 @@
 import flet as ft
 from controls.devices import Facial
-
+from controls.bancos import FalconDB
 
 import threading
 
@@ -131,8 +131,6 @@ class CardHardware(ft.Container):
             expand=True,
             content=self.layout
         )
-        
-
 
     def did_mount(self):
         # Iniciar thread para carregar info apenas após o componente estar na página
@@ -185,3 +183,44 @@ class CardHardware(ft.Container):
         texto_copiar = getattr(self.facial, atributo)
         await ft.Clipboard().set(texto_copiar)
 
+class TabelaHardwares(ft.Column):
+    def __init__(self, hardwares:list[CardHardware]):
+        super().__init__()
+        self.hardwares = hardwares
+        self.online = 0
+        self.offline = 0
+
+        self.expand=True
+        self.scroll=ft.ScrollMode.AUTO
+
+        self.controls = hardwares
+
+        self.__reverse = True
+
+    def update_status(self):
+        self.online = 0
+        self.offline = 0
+        for hardware in self.hardwares:
+            hardware._load_async_data()
+
+            if hardware.facial.online:
+                self.page.data.online += 1
+            else:
+                self.page.data.offline += 1
+    
+    def sort_by_nome(self):
+        self.controls.sort(key=lambda x: x.facial.nome_db)
+        self.update()
+
+    def sort_by_pessoas(self):
+        self.controls.sort(key=lambda x: x.facial.pessoas, reverse=self.__reverse)
+        self.__reverse = not self.__reverse
+        self.update()
+
+    def filter_search(self, search_text):
+        """Filtra o os equipamentos por nome, mac e ip"""
+        self.controls = [hardware for hardware in self.hardwares if search_text.lower() in hardware.facial.nome_db.lower() or search_text.lower() in hardware.facial.mac_address.lower() or search_text.lower() in hardware.facial.ip.lower()]
+        self.update()
+
+
+    

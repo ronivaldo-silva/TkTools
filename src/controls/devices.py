@@ -1,5 +1,4 @@
 from models.hikvision_isapi import HikvisionClient
-from controls.bancos import FalconDB
 
 class Facial:
     def __init__(self, nome, ip):
