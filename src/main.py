@@ -13,17 +13,23 @@ faciais_dict:list[dict] = [{"Nome":facial["Name"], "IP": facial["IP"]} for facia
 def main(page: ft.Page):
     page.window.width = 400
     page.window.height = 750
+    page.theme_mode = ft.ThemeMode.DARK
 
     page.data = {} # Limpando dados antigos não utilizados
 
     header_text = ft.Container(
-        content=ft.Text("Hardware Dashboard", size=20, weight=ft.FontWeight.BOLD),
+        content=ft.Text("Hardware Dashboard", size=16, weight=ft.FontWeight.BOLD),
         alignment=ft.Alignment.TOP_LEFT,
         padding=ft.Padding.only(left=10, top=10)
     )
 
     header_logo = ft.Container(
-        content=ft.Image(src="rc_icon.jpg", width=50, height=50),
+        width=40,
+        content=ft.Image(src="rc_icon.jpg", 
+            width=30,
+            height=30,
+            border_radius=ft.BorderRadius.all(15),
+        ),
         alignment=ft.Alignment.TOP_RIGHT,
         padding=ft.Padding.only(right=10, top=10)
     )
@@ -31,7 +37,6 @@ def main(page: ft.Page):
     header = ft.Row(
         controls=[header_logo, header_text]
     )
-
 
     list_hardware = ft.Column(
         expand=True,
@@ -41,24 +46,34 @@ def main(page: ft.Page):
 
     list_hardware = TabelaHardwares([ CardHardware(facial["Nome"], facial["IP"], pessoas=0) for facial in faciais_dict])
 
-    card_info = CardInfo(
-        valor_total=len(faciais_db), 
-        valor_online=0, 
-        valor_offline=0
-    )
-
     bt_normalize_all = ft.IconButton(
         icon=ft.Icons.SETTINGS_BACKUP_RESTORE_OUTLINED,
-        icon_color=ft.Colors.BLUE_300,
+        icon_color=ft.Colors.YELLOW_300,
         align=ft.Alignment.TOP_RIGHT,
         tooltip="Normalize as configurações em todos Faciais",
         on_click=lambda e: print(type(e.control.parent))
     )
 
+    bt_update_rows = ft.IconButton(
+        icon=ft.Icons.REFRESH_OUTLINED,
+        icon_color=ft.Colors.BLUE_300,
+        tooltip="Atualiza os status dos Hardwares",
+        on_click=lambda e: list_hardware.update_status(card_info)
+    )
+
+    card_info = CardInfo(
+        valor_total=len(faciais_db), 
+        valor_online=0, 
+        valor_offline=0,
+        actions=[
+            bt_normalize_all,
+            bt_update_rows,
+        ]
+    )
+
     subheader = ft.Row(
         controls=[
             card_info,
-            ft.Container(expand=True, content=bt_normalize_all),
         ]
     )
 
@@ -75,20 +90,10 @@ def main(page: ft.Page):
         on_click=lambda e: list_hardware.sort_by_nome()
     )
 
-    bt_update_rows = ft.Container(
-        expand=True,
-        content=ft.IconButton(
-            alignment=ft.Alignment.CENTER_RIGHT,
-            icon=ft.Icons.REFRESH,
-            on_click=lambda e: list_hardware.update_status(card_info)
-        )
-    )
-
     sort_row = ft.Row(
         controls=[
             bt_sort_pessoas, 
             bt_sort_nome,
-            bt_update_rows,
         ]
     )
 

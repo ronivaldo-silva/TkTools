@@ -4,8 +4,8 @@ from controls.bancos import FalconDB
 
 import threading
 
-class CardInfo(ft.Container):
-    def __init__(self, valor_online, valor_offline, valor_total):
+class CardInfo(ft.Card):
+    def __init__(self, valor_online, valor_offline, valor_total, actions:list[ft.Control] = None):
         super().__init__()
         self.alignment=ft.Alignment.TOP_LEFT
         self.padding=ft.Padding.only(left=10, top=10)
@@ -13,14 +13,35 @@ class CardInfo(ft.Container):
         self.valor_online = ft.Text(f"ON: {valor_online}", size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_300)
         self.valor_offline = ft.Text(f"OFF: {valor_offline}", size=10, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_300)
         
-        self.content = ft.Column(
-            controls=[
-                self.valor_total,
-                ft.Row(
-                    controls=[self.valor_online, self.valor_offline]
-                )
-            ]
+        self.width = 365
+
+        self.actions = ft.Container(
+            expand=True,
+            alignment=ft.Alignment.BOTTOM_RIGHT,
+            content=ft.Row(
+                alignment=ft.MainAxisAlignment.END,
+                controls=actions
+            )
         )
+
+        self.dashboard = ft.Container(
+            alignment=ft.Alignment.CENTER_LEFT,
+            content=ft.Column(
+                spacing=0,
+                controls=[
+                    self.valor_total,
+                    ft.Row([self.valor_online, self.valor_offline])
+                ]
+            )
+        )
+
+        self.content = ft.Column(
+                margin=ft.Margin.only(left=10, bottom=10, top=10),
+                controls=[
+                    ft.Row(controls=[self.dashboard, self.actions], expand=True),
+                    ft.Divider(height=1, color=ft.Colors.BLUE_300),
+                ]
+            )
 
 class CardHardware(ft.Container):
     def __init__(self, nome, ip, pessoas:int = 0):
@@ -55,6 +76,7 @@ class CardHardware(ft.Container):
 
         )
 
+        self.width = 365
         self.alignment=ft.Alignment.TOP_LEFT
         self.padding=ft.Padding.only(left=10, top=10)
         

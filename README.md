@@ -1,6 +1,23 @@
 # Newrecep app
+O sistema coleta informações básicas do sistema Solidfalcon através do banco de dados SQL Server e exibe em uma interface gráfica.
+
+Usa os dados para se conectar com os equipamentos Hikvision e coleta informações de usuários, faces, digitais, etc.
+
+Capaz de configurações dos equipamentos faciais Hikvision com padrões para integrar com o sistema Solidfalcon.
+
+Capaz de normalizar os registros de pessoas nos faciais Hikvision.
+Esses registros são Entidades tipo 1 no banco de dados e nos faciais são usuários.
+Para normalizar segue a ordem lógica:
+1. Coleta a os registros existentes nos faciais
+2. Verifica se os registros existem no banco de dados comparando os Ids (EntityId = EmployeeId)
+3. Se Não existir, envia o comando para deletar do facial
+4. Se existir, atualiza com as informações do banco de dados
+5. Por fim, insere os registros novos no facial
+
+Obs: Avaliar se viavel tratar visitantes diferente de condêminos.
 
 ## Run the app
+flet run main.py --w --port 8501
 
 ### uv
 
