@@ -47,6 +47,21 @@ def main(page: ft.Page):
         valor_offline=0
     )
 
+    bt_normalize_all = ft.IconButton(
+        icon=ft.Icons.SETTINGS_BACKUP_RESTORE_OUTLINED,
+        icon_color=ft.Colors.BLUE_300,
+        align=ft.Alignment.TOP_RIGHT,
+        tooltip="Normalize as configurações em todos Faciais",
+        on_click=lambda e: print(type(e.control.parent))
+    )
+
+    subheader = ft.Row(
+        controls=[
+            card_info,
+            ft.Container(expand=True, content=bt_normalize_all),
+        ]
+    )
+
     # Vincula o card_info a tabela para que as atualizações automáticas funcionem
     list_hardware.card_info = card_info
 
@@ -60,14 +75,20 @@ def main(page: ft.Page):
         on_click=lambda e: list_hardware.sort_by_nome()
     )
 
-    bt_sort_row = ft.Row(
+    bt_update_rows = ft.Container(
+        expand=True,
+        content=ft.IconButton(
+            alignment=ft.Alignment.CENTER_RIGHT,
+            icon=ft.Icons.REFRESH,
+            on_click=lambda e: list_hardware.update_status(card_info)
+        )
+    )
+
+    sort_row = ft.Row(
         controls=[
             bt_sort_pessoas, 
             bt_sort_nome,
-            ft.IconButton(
-                icon=ft.Icons.REFRESH,
-                on_click=lambda e: list_hardware.update_status(card_info)
-            )
+            bt_update_rows,
         ]
     )
 
@@ -80,7 +101,7 @@ def main(page: ft.Page):
             expand=True,
             content=ft.Container(
                 content=ft.Column(
-                    controls=[header, card_info, bt_sort_row, search, list_hardware]
+                    controls=[header, subheader, sort_row, search, list_hardware]
                 ),
                 alignment=ft.Alignment.TOP_LEFT,
             ),

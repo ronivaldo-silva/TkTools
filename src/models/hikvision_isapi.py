@@ -675,3 +675,155 @@ class HikvisionClient:
         except Exception as e:
             logging.error(f"Erro ao configurar heartbeat no dispositivo {self.ip}: {e}")
             raise e
+
+    # Configurações globais de Controle de Acesso (AcsCfg)
+    def get_acs_capabilities(self):
+        """
+        Obtém as capacidades de configuração do dispositivo (AcsCfg).
+        Método: GET
+        Endpoint: /ISAPI/AccessControl/AcsCfg/capabilities?format=json
+        """
+        endpoint = "/ISAPI/AccessControl/AcsCfg/capabilities?format=json"
+        try:
+            response = self._get_request(endpoint)
+            if response.content:
+                try:
+                    return response.json()
+                except Exception:
+                    pass
+            return {"AcsCfg": {}}
+        except Exception as e:
+            logging.error(f"Erro ao obter capacidades de AcsCfg do dispositivo {self.ip}: {e}")
+            raise e
+
+    def get_acs_cfg(self):
+        """
+        Lê as configurações atuais do controle de acesso (AcsCfg).
+        Método: GET
+        Endpoint: /ISAPI/AccessControl/AcsCfg?format=json
+        """
+        endpoint = "/ISAPI/AccessControl/AcsCfg?format=json"
+        try:
+            response = self._get_request(endpoint)
+            # Para fallback, é bom checar se veio algo e tentar o parse:
+            if response.content:
+                try:
+                    return response.json()
+                except Exception:
+                    pass
+            return {}
+        except Exception as e:
+            logging.error(f"Erro ao coletar configurações de AcsCfg no dispositivo {self.ip}: {e}")
+            raise e
+
+    def set_acs_cfg(self, config_dict: dict):
+        """
+        Altera as configurações do controle de acesso (AcsCfg).
+        Método: PUT
+        Endpoint: /ISAPI/AccessControl/AcsCfg?format=json
+        
+        :param config_dict: Dicionário contendo os parâmetros que deseja alterar, 
+                            Exemplo: {"showName": True, "voicePrompt": False}
+        """
+        endpoint = "/ISAPI/AccessControl/AcsCfg?format=json"
+        
+        # Constrói o corpo da requisição conforme o modelo da Hikvision
+        payload = {
+            "AcsCfg": config_dict
+        }
+        
+        try:
+            response = self._put_request(endpoint, json_data=payload)
+            if response.content:
+                try:
+                    return response.json()
+                except Exception:
+                    pass
+            # Baseado no exemplo de Retorno (Sucesso) fornecido por você
+            return {
+                "statusCode": 1,
+                "statusString": "ok",
+                "subStatusCode": "ok",
+                "errorCode": 1,
+                "errorMsg": "ok"
+            }
+        except Exception as e:
+            logging.error(f"Erro ao configurar AcsCfg no dispositivo {self.ip}: {e}")
+            raise e
+
+    # Configurações de Botões de Atalho e Intercomunicador (KeyCfg)
+    def get_key_capabilities(self, key_id: int = 1):
+        """
+        Obtém as capacidades de configuração do botão/atalho da tela (KeyCfg).
+        Método: GET
+        Endpoint: /ISAPI/VideoIntercom/keyCfg/<key_id>/capabilities?format=json
+        """
+        endpoint = f"/ISAPI/VideoIntercom/keyCfg/{key_id}/capabilities?format=json"
+        try:
+            response = self._get_request(endpoint)
+            if response.content:
+                try:
+                    return response.json()
+                except Exception:
+                    pass
+            return {"KeyCfg": {}}
+        except Exception as e:
+            logging.error(f"Erro ao obter capacidades de KeyCfg do botão {key_id} no dispositivo {self.ip}: {e}")
+            raise e
+
+    def get_key_cfg(self, key_id: int = 1):
+        """
+        Lê como o botão de atalho está configurado no momento (KeyCfg).
+        Método: GET
+        Endpoint: /ISAPI/VideoIntercom/keyCfg/<key_id>?format=json
+        """
+        endpoint = f"/ISAPI/VideoIntercom/keyCfg/{key_id}?format=json"
+        try:
+            response = self._get_request(endpoint)
+            if response.content:
+                try:
+                    return response.json()
+                except Exception:
+                    pass
+            return {}
+        except Exception as e:
+            logging.error(f"Erro ao coletar configurações de KeyCfg do botão {key_id} no dispositivo {self.ip}: {e}")
+            raise e
+
+    def set_key_cfg(self, key_id: int, config_dict: dict):
+        """
+        Altera as configurações de funcionalidade e ação do botão (KeyCfg).
+        Método: PUT
+        Endpoint: /ISAPI/VideoIntercom/keyCfg/<key_id>?format=json
+        
+        :param key_id: ID numérico do botão (geralmente 1 para o principal).
+        :param config_dict: Dicionário contendo os parâmetros da alteração.
+                            A tag 'id' será embutida internamente para segurança.
+                            Exemplo: {"callMethod": "manageCenter", "enableCallCenter": True}
+        """
+        endpoint = f"/ISAPI/VideoIntercom/keyCfg/{key_id}?format=json"
+        
+        # Garante a presença do ID na estrutura enviada se ele foi intencionalmente modificado
+        config_dict["id"] = key_id
+        
+        payload = {
+            "KeyCfg": config_dict
+        }
+        
+        try:
+            response = self._put_request(endpoint, json_data=payload)
+            if response.content:
+                try:
+                    return response.json()
+                except Exception:
+                    pass
+            return {
+                "statusCode": 1,
+                "statusString": "OK",
+                "subStatusCode": "OK",
+                "errorCode": 1,
+                "errorMsg": "ok"
+            }
+        except Exception as e:
+            logging.error(f"Erro ao configurar KeyCfg do botão {key_id} no dispositivo {self.ip}: {e}")
+            raise e
