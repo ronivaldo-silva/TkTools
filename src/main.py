@@ -1,19 +1,36 @@
 import flet as ft
 from controls.components import CardInfo, CardHardware, TabelaHardwares
-from controls.bancos import FalconDB
+from controls.bancos import FalconDB, ThinkimDB 
+from controls.log_control import LogElevatorControl, LogIntegrationControl
 
 falcon = FalconDB()
+thinkim = ThinkimDB()
 # Coleta de faciais do Solid Falcon
-faciais_db = falcon._get_hardware(7)
-# Ordenar por nome
-faciais_db.sort(key=lambda x: x["Name"])
+if falcon.is_connected:
+    faciais_db = falcon._get_hardware(7)
+    # Ordenar por nome
+    faciais_db.sort(key=lambda x: x["Name"])
 
-faciais_dict:list[dict] = [{"Nome":facial["Name"], "IP": facial["IP"]} for facial in faciais_db]
+    faciais_dict:list[dict] = [{"Nome":facial["Name"], "IP": facial["IP"]} for facial in faciais_db]
+else:
+    faciais_dict = []
+
+# Inicializa os serviços de log em background
+elevators_log_path = r"C:\Solid Falcon\Integrations\Elevators\Local\Logs\ElevatorsLog.txt"
+integrations_log_path = r"C:\Solid Falcon\Local\Logs\IntegrationsLog.txt"
+
+monitor_elevators = LogElevatorControl(elevators_log_path)
+monitor_integrations = LogIntegrationControl(integrations_log_path)
+
+monitor_elevators.iniciar()
+monitor_integrations.iniciar()
 
 def main(page: ft.Page):
     page.window.width = 400
     page.window.height = 750
     page.theme_mode = ft.ThemeMode.DARK
+    
+    page.on_close = lambda _: (monitor_elevators.parar(), monitor_integrations.parar())
 
     page.data = {} # Limpando dados antigos não utilizados
 
@@ -99,6 +116,9 @@ def main(page: ft.Page):
 
     search = ft.TextField(
         label="Search",
+        width=300,
+        height=40,
+        text_size=12,
         on_change=lambda e: list_hardware.filter_search(e.control.value)
     )
 

@@ -207,8 +207,11 @@ class CardHardware(ft.Container):
     async def _copy_device(self, e:ft.ControlEvent):
         """ Copia os dados do equipamento para o clipboard e fecha o popup """
         atributo = e.control.data
-        texto_copiar = getattr(self.facial, atributo)
-        await ft.Clipboard().set(texto_copiar)
+        texto_copiar = str(getattr(self.facial, atributo))
+        try:
+            await ft.Clipboard().set(texto_copiar)
+        except Exception as e:
+            print(e)
 
 class TabelaHardwares(ft.Column):
     def __init__(self, hardwares:list[CardHardware]):
@@ -310,5 +313,6 @@ class TabelaHardwares(ft.Column):
         self.empty_result.visible = not algum_visivel
         self.update()
 
-
+    def export_hardwares_csv(self):
+        pass
     

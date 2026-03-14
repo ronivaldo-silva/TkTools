@@ -1,0 +1,12 @@
+Objetivo: Adicionar nova função: Atualiar os usuários dos faciais.
+1. Coletar lista de usuários do facial e salvar no banco de dados.
+2. Comparar o EmploieeId dos daciais com EntityId do Banco de dados.
+3. Caso não exista, delete.
+    Caso exista, atualize.
+    Inserir os outros registros do banco de dados no equipamento.
+
+4. now. Aprimorando conexões e relações com bancos de dados.
+5. next. Criar consultas necessárias para novas funções.
+6. next. Criar funções de Faciais para inserir pessoas com parâmetros necessários.
+7. lest. Criar a função que realiza as ações e aplicar em um botão no painel.
+

@@ -75,22 +75,6 @@ class HikvisionClient:
             logging.error(f"Error getting user info count for {self.ip}: {e}")
             raise e
 
-    def get_user_count(self):
-        try:
-            info = self.get_user_info_count()
-            return info.get('userNumber', 0)
-        except Exception as e:
-             logging.error(f"Error getting user count for {self.ip}: {e}")
-             return "Err"
-
-    def get_face_count(self):
-        try:
-            info = self.get_user_info_count()
-            return info.get('bindFaceUserNumber', 0)
-        except Exception as e:
-            logging.error(f"Error getting face count for {self.ip}: {e}")
-            return "Err"
-
     def get_device_capacity(self):
         """
         Tenta buscar a capacidade máxima de usuários do dispositivo via /ISAPI/AccessControl/Capabilities.
@@ -445,7 +429,6 @@ class HikvisionClient:
                 raise e
                 
         return all_events
-
 
     def set_advertising_mode(self, mode: str = "advertising", display_type: str = "full", popup_preview: bool = True):
         """
@@ -826,4 +809,176 @@ class HikvisionClient:
             }
         except Exception as e:
             logging.error(f"Erro ao configurar KeyCfg do botão {key_id} no dispositivo {self.ip}: {e}")
+            raise e
+
+    def edit_user(self, employee_no: str, user_data: dict) -> dict:
+        """
+        1. Alterar Usuário (Edit Person Information)
+        Objetivo: Modificar os dados de um usuário já existente.
+        Método HTTP: PUT
+        Endpoint: /ISAPI/AccessControl/UserInfo/Modify?format=json
+        
+        :param employee_no: Número da matrícula do usuário (obrigatório).
+        :param user_data: Dicionário com os dados modificados do usuário a serem enviados.
+        :return: Resposta JSON confirmando a edição.
+        """
+        endpoint = "/ISAPI/AccessControl/UserInfo/Modify?format=json"
+        
+        # Regra do Payload: O JSON deve ser enviado dentro do objeto "UserInfo".
+        # O campo "employeeNo" é obrigatório para identificar quem será alterado.
+        user_data["employeeNo"] = str(employee_no)
+        payload = {"UserInfo": user_data}
+        
+        try:
+            response = self._put_request(endpoint, json_data=payload)
+            data = response.json()
+            
+            # Tratamento de erro: lendo o "statusCode" da resposta.
+            # Se for diferente de 1, lance uma exceção contendo o "errorMsg".
+            if str(data.get("statusCode", "1")) != "1":
+                raise Exception(f"Falha ao alterar usuário ({employee_no}): {data.get('errorMsg', 'Erro desconhecido')} (Status: {data.get('statusCode')})")
+                
+            return data
+        except Exception as e:
+            logging.error(f"Erro ao modificar usuário {employee_no} no dispositivo {self.ip}: {e}")
+            raise e
+
+    def delete_users(self, mode: str = "all", employee_ids: list = None) -> dict:
+        """
+        2. Deletar Usuário(s) (Delete Person Information)
+        Objetivo: Excluir usuários específicos ou todos os usuários.
+        Método HTTP: PUT
+        Endpoint: /ISAPI/AccessControl/UserInfoDetail/Delete?format=json
+        
+        :param mode: "all" para limpar todos os usuários, ou "byEmployeeNo" para excluir por IDs.
+        :param employee_ids: Lista de matrículas em formato string (ex: ["1001", "1002"]).
+        :return: Resposta JSON confirmando a deleção.
+        """
+        endpoint = "/ISAPI/AccessControl/UserInfoDetail/Delete?format=json"
+        
+        # Regra do Payload: O JSON deve indicar o "mode" de exclusão
+        payload = {
+            "UserInfoDetail": {
+                "mode": mode
+            }
+        }
+        
+        # Se for por ID, deve enviar a lista "EmployeeNoList"
+        if mode == "byEmployeeNo" and employee_ids:
+            payload["UserInfoDetail"]["EmployeeNoList"] = [{"employeeNo": str(eid)} for eid in employee_ids]
+            
+        try:
+            response = self._put_request(endpoint, json_data=payload)
+            data = response.json()
+            
+            # Validação dostatusCode e errorMsg
+            if str(data.get("statusCode", "1")) != "1":
+                raise Exception(f"Falha ao deletar usuários (modo: {mode}): {data.get('errorMsg', 'Erro desconhecido')} (Status: {data.get('statusCode')})")
+                
+            return data
+        except Exception as e:
+            logging.error(f"Erro ao deletar usuários no dispositivo {self.ip}: {e}")
+            raise e
+
+    def get_user_capabilities(self) -> dict:
+        """
+        3 - A) Obter Capacidade de Usuários
+        Objetivo: Consultar capacidades e suporte de operações da rota de UserInfo.
+        Método HTTP: GET
+        Endpoint: /ISAPI/AccessControl/UserInfo/capabilities?format=json
+        
+        :return: Dicionário contendo os dados brutos de capacidade e o atributo mapeado "supports_put_modify".
+        """
+        endpoint = "/ISAPI/AccessControl/UserInfo/capabilities?format=json"
+        
+        try:
+            response = self._get_request(endpoint)
+            data = response.json()
+            
+            # O código deve mapear no JSON de retorno se o nó supportFunction contém a string "put"
+            supports_put = False
+            user_info_cap = data.get("UserInfo", {})
+            
+            if "supportFunction" in user_info_cap:
+                supp_func = user_info_cap["supportFunction"]
+                if isinstance(supp_func, dict) and "@opt" in supp_func:
+                    supports_put = "put" in supp_func["@opt"].lower()
+                elif isinstance(supp_func, str):
+                    supports_put = "put" in supp_func.lower()
+                    
+            return {
+                "raw_capabilities": data,
+                "supports_put_modify": supports_put
+            }
+        except Exception as e:
+            logging.error(f"Erro ao obter capacidades de UserInfo no dispositivo {self.ip}: {e}")
+            raise e
+
+    def get_delete_capabilities(self) -> dict:
+        """
+        3 - B) Obter Capacidade de Exclusão
+        Objetivo: Consultar capacidades da rota de exclusão (Delete).
+        Método HTTP: GET
+        Endpoint: /ISAPI/AccessControl/UserInfoDetail/Delete/capabilities?format=json
+        
+        :return: Dicionário mapeando os modos de exclusão suportados.
+        """
+        endpoint = "/ISAPI/AccessControl/UserInfoDetail/Delete/capabilities?format=json"
+        
+        try:
+            response = self._get_request(endpoint)
+            data = response.json()
+            
+            # O código deve mapear os modos de exclusão suportados no nó "mode"
+            modes_suportados = []
+            delete_cap = data.get("UserInfoDetail", {})
+            
+            if "mode" in delete_cap:
+                mode_node = delete_cap["mode"]
+                if isinstance(mode_node, dict) and "@opt" in mode_node:
+                    modes_suportados = mode_node["@opt"].split(",")
+                elif isinstance(mode_node, str):
+                    modes_suportados = mode_node.split(",")
+                    
+            return {
+                "raw_capabilities": data,
+                "supported_modes": modes_suportados
+            }
+        except Exception as e:
+            logging.error(f"Erro ao obter capacidades do Delete no dispositivo {self.ip}: {e}")
+            raise e
+
+    def get_delete_process_status(self) -> dict:
+        """
+        4. Coletar Status da Deleção em Massa (Delete Process)
+        Objetivo: Monitorar o progresso do processo de exclusão de usuários na base de dados do dispositivo.
+        Método HTTP: GET
+        Endpoint: /ISAPI/AccessControl/UserInfoDetail/DeleteProcess?format=json
+        
+        :return: Dicionário contendo o percentual (0 a 100) e o status atual.
+        """
+        endpoint = "/ISAPI/AccessControl/UserInfoDetail/DeleteProcess?format=json"
+        
+        try:
+            response = self._get_request(endpoint)
+            data = response.json()
+            
+            # A função deve processar o JSON de resposta extraindo "status" e "percent"
+            process_data = data.get("UserInfoDetailDeleteProcess", {})
+            
+            status = process_data.get("status", "unknown")
+            percent = 0
+            if "percent" in process_data:
+                try:
+                    percent = int(process_data["percent"])
+                except ValueError:
+                    percent = 0
+                    
+            return {
+                "status": status,
+                "percent": percent,
+                "raw_process_data": data
+            }
+        except Exception as e:
+            logging.error(f"Erro ao obter o status do delete process no dispositivo {self.ip}: {e}")
             raise e

@@ -49,4 +49,15 @@ class Facial:
     def get_device_info(self):
         return self.isapi.get_device_info()
     
+    def delete_all_users(self):
+        self.isapi.delete_users(mode="all")
+    
+    def delete_users_by_id(self, user_ids: list):
+        self.isapi.delete_users(mode="byEmployeeNo", employee_ids=user_ids)
+
+    def edit_user(self, employee_no: str, user_data: dict):
+        self.isapi.edit_user(employee_no, user_data)
+    
+    def delete_get_progress(self):
+        return self.isapi.get_delete_process_status()
     
