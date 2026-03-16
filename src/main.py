@@ -9,15 +9,16 @@ thinkim = ThinkimDB()
 if falcon.is_connected:
     faciais_db = falcon._get_hardware(7)
     # Ordenar por nome
-    faciais_db.sort(key=lambda x: x["Name"])
+    faciais_db.sort(key=lambda x: x.Name)
 
-    faciais_dict:list[dict] = [{"Nome":facial["Name"], "IP": facial["IP"]} for facial in faciais_db]
+    faciais_dict:list[dict] = [{"Nome":facial.Name, "IP": facial.IP} for facial in faciais_db]
 else:
+    faciais_db = []
     faciais_dict = []
 
 # Inicializa os serviços de log em background
-elevators_log_path = r"C:\Solid Falcon\Integrations\Elevators\Local\Logs\ElevatorsLog.txt"
-integrations_log_path = r"C:\Solid Falcon\Local\Logs\IntegrationsLog.txt"
+elevators_log_path = r"temp/ElevatorsLog.txt"
+integrations_log_path = r"temp/IntegrationsLog.txt"
 
 monitor_elevators = LogElevatorControl(elevators_log_path)
 monitor_integrations = LogIntegrationControl(integrations_log_path)

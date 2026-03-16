@@ -5,6 +5,9 @@ from threading import Thread
 
 from models.database import SqlServer
 from models.log_reader import LogReader
+from models.models import LogElevators, LogIntegrations
+from sqlalchemy import select, desc
+
 
 class LogElevatorControl:
     """
@@ -33,25 +36,21 @@ class LogElevatorControl:
             if not linhas:
                 return
 
+            session = self.db.get_session()
+            if not session:
+                return
+            
             # Busca últimos registros no banco (usamos os ultimos inseridos)
-            ultimos_db = self.db.consultar("SELECT TOP 100 datahora, dados FROM log_elevators ORDER BY id DESC")
-            if not ultimos_db:
-                ultimos_db = []
+            stmt = select(LogElevators).order_by(desc(LogElevators.id)).limit(100)
+            ultimos_db = session.execute(stmt).scalars().all()
 
             db_signature = []
             for row in ultimos_db:
-                if row.get('datahora'):
-                    if isinstance(row['datahora'], str):
-                        try:
-                            dt = datetime.strptime(row['datahora'].split('.')[0], "%Y-%m-%d %H:%M:%S")
-                            dh_str = dt.strftime("%d/%m/%Y %H:%M")
-                        except Exception:
-                            dh_str = row['datahora']
-                    else:
-                        dh_str = row['datahora'].strftime("%d/%m/%Y %H:%M")
+                if row.datahora:
+                    dh_str = row.datahora.strftime("%m/%d/%Y %H:%M")
                 else:
                     dh_str = ""
-                db_signature.append((dh_str, row.get('dados', '')))
+                db_signature.append((dh_str, row.dados or ''))
 
             # Parse log do arquivo 
             # (Note: logs mais recentes estão no topo do arquivo)
@@ -84,10 +83,13 @@ class LogElevatorControl:
             for linha in reversed(novas_linhas):
                 dh_str, dados = self._parse_file_line(linha)
                 if dh_str:
-                    dh_sql = datetime.strptime(dh_str, "%d/%m/%Y %H:%M").strftime("%Y-%m-%d %H:%M:00")
-                    self.db.inserir("INSERT INTO log_elevators (datahora, dados) VALUES (?, ?)", (dh_sql, dados))
+                    dh_sql = datetime.strptime(dh_str, "%d/%m/%Y %H:%M")
+                    novo_log = LogElevators(datahora=dh_sql, dados=dados)
                 else:
-                    self.db.inserir("INSERT INTO log_elevators (dados) VALUES (?)", (linha,))
+                    novo_log = LogElevators(dados=linha)
+                session.add(novo_log)
+            session.commit()
+            session.close()
 
         except Exception as e:
             print(f"Erro ao atualizar o banco: {e}")
@@ -152,24 +154,20 @@ class LogIntegrationControl:
             if not linhas:
                 return
 
-            ultimos_db = self.db.consultar("SELECT TOP 100 datahora, evento, dados FROM log_integrations ORDER BY id DESC")
-            if not ultimos_db:
-                ultimos_db = []
+            session = self.db.get_session()
+            if not session:
+                return
+
+            stmt = select(LogIntegrations).order_by(desc(LogIntegrations.id)).limit(100)
+            ultimos_db = session.execute(stmt).scalars().all()
 
             db_signature = []
             for row in ultimos_db:
-                if row.get('datahora'):
-                    if isinstance(row['datahora'], str):
-                        try:
-                            dt = datetime.strptime(row['datahora'].split('.')[0], "%Y-%m-%d %H:%M:%S")
-                            dh_str = dt.strftime("%d/%m/%Y %H:%M")
-                        except Exception:
-                            dh_str = row['datahora']
-                    else:
-                        dh_str = row['datahora'].strftime("%d/%m/%Y %H:%M")
+                if row.datahora:
+                    dh_str = row.datahora.strftime("%d/%m/%Y %H:%M")
                 else:
                     dh_str = ""
-                db_signature.append((dh_str, row.get('evento', ''), row.get('dados', '')))
+                db_signature.append((dh_str, row.evento or '', row.dados or ''))
 
             file_parsed = [self._parse_file_line(l) for l in linhas]
 
@@ -198,10 +196,13 @@ class LogIntegrationControl:
             for linha in reversed(novas_linhas):
                 dh_str, evento, dados = self._parse_file_line(linha)
                 if dh_str:
-                    dh_sql = datetime.strptime(dh_str, "%d/%m/%Y %H:%M").strftime("%Y-%m-%d %H:%M:00")
-                    self.db.inserir("INSERT INTO log_integrations (datahora, evento, dados) VALUES (?, ?, ?)", (dh_sql, evento, dados))
+                    dh_sql = datetime.strptime(dh_str, "%d/%m/%Y %H:%M")
+                    novo_log = LogIntegrations(datahora=dh_sql, evento=evento, dados=dados)
                 else:
-                    self.db.inserir("INSERT INTO log_integrations (dados) VALUES (?)", (linha,))
+                    novo_log = LogIntegrations(dados=linha)
+                session.add(novo_log)
+            session.commit()
+            session.close()
 
         except Exception as e:
             print(f"Erro ao atualizar o banco de integrações: {e}")
