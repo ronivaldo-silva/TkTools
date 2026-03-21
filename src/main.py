@@ -1,6 +1,6 @@
 import flet as ft
 from controls.components import CardInfo, CardHardware, TabelaHardwares
-from controls.bancos import FalconDB, ThinkimDB 
+from controls.bancos import FalconDB, ThinkimDB
 from controls.log_control import LogElevatorControl, LogIntegrationControl
 
 falcon = FalconDB()
@@ -17,14 +17,11 @@ else:
     faciais_dict = []
 
 # Inicializa os serviços de log em background
-elevators_log_path = r"temp/ElevatorsLog.txt"
-integrations_log_path = r"temp/IntegrationsLog.txt"
+monitor_elevators = LogElevatorControl()
+monitor_integrations = LogIntegrationControl()
 
-monitor_elevators = LogElevatorControl(elevators_log_path)
-monitor_integrations = LogIntegrationControl(integrations_log_path)
-
-monitor_elevators.iniciar()
-monitor_integrations.iniciar()
+# monitor_elevators.iniciar()
+# monitor_integrations.iniciar()
 
 def main(page: ft.Page):
     page.window.width = 400
@@ -59,10 +56,10 @@ def main(page: ft.Page):
     list_hardware = ft.Column(
         expand=True,
         scroll=ft.ScrollMode.AUTO,
-        controls=[ CardHardware(facial["Nome"], facial["IP"], pessoas=0) for facial in faciais_dict]
+        controls=[ CardHardware(facial["Nome"], facial["IP"]) for facial in faciais_dict]
     )
 
-    list_hardware = TabelaHardwares([ CardHardware(facial["Nome"], facial["IP"], pessoas=0) for facial in faciais_dict])
+    list_hardware = TabelaHardwares([ CardHardware(facial["Nome"], facial["IP"]) for facial in faciais_dict])
 
     bt_normalize_all = ft.IconButton(
         icon=ft.Icons.SETTINGS_BACKUP_RESTORE_OUTLINED,

@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from models.database import SqlServer
-from models.models import Hardware, Entity, EntityIdentifier, Base
+from models.models import Hardware, Entity, EntityIdentifier, ThinkimBase
 
 class FalconDB:
     def __init__(self):
@@ -66,8 +66,7 @@ class ThinkimDB:
         self.banco = SqlServer("thinkim")
         self.engine = self.banco.get_engine()
         self.is_connected = self.engine is not None
-        if self.is_connected:
-            self._create_tables_if_not_exists()
+        self.try_start_db()
 
     def _conectar(self):
         return self.engine
@@ -88,7 +87,7 @@ class ThinkimDB:
         engine = self.banco.get_engine()
         if engine:
             try:
-                Base.metadata.create_all(engine)
+                ThinkimBase.metadata.create_all(engine)
                 print("Tabelas do ThinkimDB verificadas/criadas com sucesso (SQLAlchemy).")
             except Exception as e:
                 print(f"Erro ao criar tabelas no banco de dados thinkim: {e}")

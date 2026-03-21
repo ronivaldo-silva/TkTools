@@ -3,12 +3,15 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from typing import Optional
 from datetime import datetime
 
-class Base(DeclarativeBase):
+class FalconBase(DeclarativeBase):
+    pass
+
+class ThinkimBase(DeclarativeBase):
     pass
 
 # ---- Banco de Dados: FALCON ----
 
-class Hardware(Base):
+class Hardware(FalconBase):
     __tablename__ = 'hardware'
     __table_args__ = {'schema': 'dbo'}
 
@@ -20,7 +23,7 @@ class Hardware(Base):
     Priority: Mapped[int] = mapped_column(Integer)
     Sync: Mapped[int] = mapped_column(Integer)
 
-class Entity(Base):
+class Entity(FalconBase):
     __tablename__ = 'entity'
     __table_args__ = {'schema': 'dbo'}
 
@@ -37,7 +40,7 @@ class Entity(Base):
     BlockedStart: Mapped[Optional[datetime]] = mapped_column(DateTime)
     IsTempBlocked: Mapped[bool] = mapped_column(Boolean)
 
-class EntityIdentifier(Base):
+class EntityIdentifier(FalconBase):
     __tablename__ = 'entityidentifier'
     __table_args__ = {'schema': 'dbo'}
 
@@ -45,7 +48,7 @@ class EntityIdentifier(Base):
 
 # ---- Banco de Dados: THINKIM ----
 
-class UsuariosFaciais(Base):
+class UsuariosFaciais(ThinkimBase):
     __tablename__ = 'usuarios_faciais'
     
     HardwareId: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -58,14 +61,14 @@ class UsuariosFaciais(Base):
     numOfCard: Mapped[Optional[int]] = mapped_column(Integer)
     numOfFace: Mapped[Optional[int]] = mapped_column(Integer)
 
-class LogElevators(Base):
+class LogElevators(ThinkimBase):
     __tablename__ = 'log_elevators'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     datahora: Mapped[Optional[datetime]] = mapped_column(DateTime)
     dados: Mapped[str] = mapped_column(String)
 
-class LogIntegrations(Base):
+class LogIntegrations(ThinkimBase):
     __tablename__ = 'log_integrations'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

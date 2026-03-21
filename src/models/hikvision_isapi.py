@@ -982,3 +982,49 @@ class HikvisionClient:
         except Exception as e:
             logging.error(f"Erro ao obter o status do delete process no dispositivo {self.ip}: {e}")
             raise e
+
+    def get_system_time(self) -> dict:
+        """
+        Coleta as configuracoes de data e hora atuais do equipamento.
+        Metodo: GET
+        Endpoint: /ISAPI/System/time
+        Autenticacao: HTTP Digest Auth.
+        
+        A funcao realiza o parser do XML retornado pela API da Hikvision
+        convertendo o padrao ISO 8601 da tag <localTime> para um objeto de formato nativo datetime
+        utilizando datetime.fromisoformat.
+        """
+        endpoint = "/ISAPI/System/time"
+        
+        try:
+            response = self._get_request(endpoint)
+            
+            content = response.text
+            import re
+            
+            # Limpa namespaces da resposta XML para facilitar a analise usando ElementTree
+            content_cleaned = re.sub(r' xmlns="[^"]+"', '', content, count=1)
+            content_cleaned = re.sub(r' xmlns:[a-zA-Z0-9]+="[^"]+"', '', content_cleaned)
+            
+            root = ET.fromstring(content_cleaned)
+            
+            result_dict = {}
+            for child in root:
+                if child.tag == 'localTime' and child.text:
+                    # O valor da tag <localTime> vem no padrao ISO 8601 (com fuso horario).
+                    # Utilizamos o metodo datetime.fromisoformat() para transformar diretamente.
+                    from datetime import datetime
+                    try:
+                        result_dict[child.tag] = datetime.fromisoformat(child.text)
+                    except ValueError:
+                        # Excecao para caso particular o formato saia do padrao nativo
+                        result_dict[child.tag] = child.text
+                else:
+                    result_dict[child.tag] = child.text
+                    
+            return result_dict
+            
+        except Exception as e:
+            logging.error(f"Erro ao obter configuracoes de tempo do dispositivo {self.ip}: {e}")
+            raise e
+

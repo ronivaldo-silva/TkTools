@@ -44,7 +44,7 @@ class CardInfo(ft.Card):
             )
 
 class CardHardware(ft.Container):
-    def __init__(self, nome, ip, pessoas:int = 0):
+    def __init__(self, nome, ip):
         super().__init__()
         
         self.facial = Facial(nome, ip)
@@ -81,6 +81,7 @@ class CardHardware(ft.Container):
         self.padding=ft.Padding.only(left=10, top=10)
         
         self.status_icon = ft.Icon(ft.Icons.DOWNLOADING_OUTLINED, ft.Colors.BLUE_300)
+        self.clock_icon = ft.Icon(ft.Icons.ACCESS_TIME_OUTLINED, color=ft.Colors.GREY_600, size=20, tooltip="Horário não sincronizado")
         
         self.titulo_text = ft.Text(nome)
         self.ip_text = ft.Text(f"● {ip}", color=ft.Colors.BLUE_300, size=10)
@@ -105,8 +106,8 @@ class CardHardware(ft.Container):
             on_click=lambda e: self.__show_popup(e, self.popup_copy)
         )
 
-        self.pessoas_text = ft.Text(f" {pessoas}", color=ft.Colors.YELLOW_300)
-        self.faces_text = ft.Text(f" - ", color=ft.Colors.YELLOW_300)
+        self.pessoas_text = ft.Text(" - ", color=ft.Colors.YELLOW_300)
+        self.faces_text = ft.Text(" - ", color=ft.Colors.YELLOW_300)
 
         self.pessoas_row = ft.Row(
             spacing=0,
@@ -145,7 +146,7 @@ class CardHardware(ft.Container):
                 self.status_icon,
                 self.titulo,
                 self.pessoas_card,
-                ft.Container(expand=True, content=self.bt_restart, alignment=ft.Alignment.CENTER_RIGHT),
+                ft.Container(expand=True, content=ft.Row([self.clock_icon, self.bt_restart], alignment=ft.MainAxisAlignment.END, spacing=0), alignment=ft.Alignment.CENTER_RIGHT),
             ]
         )
 
@@ -158,9 +159,46 @@ class CardHardware(ft.Container):
         # Iniciar thread para carregar info apenas após o componente estar na página
         threading.Thread(target=self._load_async_data, daemon=True).start()
 
+    def _check_time_sync(self):
+        import datetime
+        if not self.facial._datahora:
+            self.clock_icon.color = ft.Colors.GREY_600
+            self.clock_icon.tooltip = "Horario indisponivel ou offline"
+            return
+            
+        try:
+            device_time = self.facial._datahora
+            if isinstance(device_time, str):
+                self.clock_icon.tooltip = f"Hora como texto: {device_time}"
+                self.clock_icon.color = ft.Colors.BLUE_300
+                return
+                
+            if hasattr(device_time, 'tzinfo') and device_time.tzinfo is not None:
+                # Com fuso
+                agora = datetime.datetime.now(datetime.timezone.utc)
+                diff = abs((agora - device_time.astimezone(datetime.timezone.utc)).total_seconds())
+            else:
+                agora = datetime.datetime.now()
+                diff = abs((agora - device_time).total_seconds())
+            
+            # Tooltip mostrando a string de horário
+            self.clock_icon.tooltip = f"Equipamento: {device_time.strftime('%d/%m/%Y %H:%M:%S')}"
+            
+            # Diferença aceitável de 2 minutos (120s)
+            if diff <= 120:
+                self.clock_icon.color = ft.Colors.GREEN_300
+            else:
+                self.clock_icon.color = ft.Colors.YELLOW_300
+        except Exception as e:
+            self.clock_icon.color = ft.Colors.RED_300
+            self.clock_icon.tooltip = f"Erro comparando hora (Data: {self.facial._datahora})"
+
     def _load_async_data(self):
             
         self.facial.load_info()
+        if self.facial.online:
+            self.facial.update_time()
+        self._check_time_sync()
         
         # Atualizar UI individual do card
         if self.facial.online:
@@ -235,7 +273,20 @@ class TabelaHardwares(ft.Column):
             visible=False
         )
 
-        self.controls = [self.empty_result] + hardwares
+        # Controle para exibir quando o banco estiver offline
+        self.offline_result = ft.Container(
+            content=ft.Column(
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Icon(ft.Icons.OFFLINE_BOLT_OUTLINED, size=50, color=ft.Colors.RED_300),
+                    ft.Text("Banco de dados offline", color=ft.Colors.RED_300)
+                ]
+            ),
+            padding=50,
+            visible=False
+        )
+
+        self.controls = [self.empty_result, self.offline_result] + hardwares
 
         self.__reverse = True
 
@@ -253,10 +304,31 @@ class TabelaHardwares(ft.Column):
         """ Atualiza todos os hardwares e vincula o card_info """
         self.card_info = card_info
         
+        banco = FalconDB()
+        if not banco.is_connected:
+            self.offline_result.visible = True
+            for hardware in self.hardwares:
+                hardware.facial.online = False
+                hardware.status_icon.icon = ft.Icons.OFFLINE_BOLT_OUTLINED
+                hardware.status_icon.color = ft.Colors.RED_300
+                hardware.pessoas_text.value = " - "
+                hardware.faces_text.value = " - "
+                hardware.clock_icon.color = ft.Colors.GREY_600
+                hardware.clock_icon.tooltip = "Offline"
+                try: hardware.update()
+                except: pass
+            self.refresh_stats()
+            self.update()
+            return
+        
+        self.offline_result.visible = False
+        
         for hardware in self.hardwares:
             # Reseta o ícone visual para "carregando"
             hardware.status_icon.icon = ft.Icons.DOWNLOADING_OUTLINED
             hardware.status_icon.color = ft.Colors.BLUE_300
+            hardware.clock_icon.color = ft.Colors.GREY_600
+            hardware.clock_icon.tooltip = "Verificando relógio..."
             try: hardware.update()
             except: pass
             
@@ -266,20 +338,20 @@ class TabelaHardwares(ft.Column):
     def sort_by(self, attr_return:str):
         """ Ordena a lista de hardwares por qualquer atributo do objeto facial """
         self.hardwares.sort(key=lambda x: getattr(x.facial, attr_return) if getattr(x.facial, attr_return) is not None else "", reverse=self.__reverse)
-        self.controls = [self.empty_result] + self.hardwares
+        self.controls = [self.empty_result, self.offline_result] + self.hardwares
         self.__reverse = not self.__reverse
         self.update()
 
     def sort_by_nome(self):
         """ Ordena especificamente por nome_db """
         self.hardwares.sort(key=lambda x: x.facial.nome_db.lower() if x.facial.nome_db else "")
-        self.controls = [self.empty_result] + self.hardwares
+        self.controls = [self.empty_result, self.offline_result] + self.hardwares
         self.update()
 
     def sort_by_pessoas(self):
         """ Ordena especificamente por quantidade de pessoas """
         self.hardwares.sort(key=lambda x: int(x.facial.pessoas) if x.facial.pessoas is not None else 0, reverse=self.__reverse)
-        self.controls = [self.empty_result] + self.hardwares
+        self.controls = [self.empty_result, self.offline_result] + self.hardwares
         self.__reverse = not self.__reverse
         self.update()
 
@@ -301,9 +373,10 @@ class TabelaHardwares(ft.Column):
             nome = (hardware.facial.nome_db or "").lower()
             ip = (hardware.facial.ip or "").lower()
             mac = (hardware.facial.mac_address or "").lower()
+            firmware = (hardware.facial.firmware or "").lower()
             
             # Verifica se o termo está em algum dos campos
-            if search_text in nome or search_text in ip or search_text in mac:
+            if search_text in nome or search_text in ip or search_text in mac or search_text in firmware:
                 hardware.visible = True
                 algum_visivel = True
             else:

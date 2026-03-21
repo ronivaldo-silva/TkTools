@@ -1,5 +1,6 @@
 import time
 import os
+from dotenv import load_dotenv
 from datetime import datetime
 from threading import Thread
 
@@ -8,14 +9,16 @@ from models.log_reader import LogReader
 from models.models import LogElevators, LogIntegrations
 from sqlalchemy import select, desc
 
+load_dotenv()
 
 class LogElevatorControl:
     """
     Controle projetado para monitorar um arquivo de log e atualizar no banco de dados.
     """
-    def __init__(self, file_path):
+    def __init__(self, file_path="C:/Solid Falcon/Integrations/Elevators/Local/Logs/ElevatorsLog.txt"):
+        self.path = os.getenv("PATH_LOG_ELEVATOR", file_path)
         self.db = SqlServer("thinkim")
-        self.log_reader = LogReader(file_path)
+        self.log_reader = LogReader(self.path)
         self.is_running = False
 
     def _parse_file_line(self, line):
@@ -47,7 +50,7 @@ class LogElevatorControl:
             db_signature = []
             for row in ultimos_db:
                 if row.datahora:
-                    dh_str = row.datahora.strftime("%m/%d/%Y %H:%M")
+                    dh_str = row.datahora.strftime("%d/%m/%Y %H:%M")
                 else:
                     dh_str = ""
                 db_signature.append((dh_str, row.dados or ''))
@@ -80,6 +83,8 @@ class LogElevatorControl:
 
             # Inserção a partir dos antigos para garantir a integridade DB e lógicas de sequencia 
             # (oldest is index N, newest is index 0)
+            print(f"[LogElevatorControl] Preparando inserção de {len(novas_linhas)} novas linhas no banco...")
+            linhas_inseridas = 0
             for linha in reversed(novas_linhas):
                 dh_str, dados = self._parse_file_line(linha)
                 if dh_str:
@@ -88,11 +93,13 @@ class LogElevatorControl:
                 else:
                     novo_log = LogElevators(dados=linha)
                 session.add(novo_log)
+                linhas_inseridas += 1
             session.commit()
+            print(f"[LogElevatorControl] Concluído! {linhas_inseridas} registros salvos no banco.")
             session.close()
 
         except Exception as e:
-            print(f"Erro ao atualizar o banco: {e}")
+            print(f"[LogElevatorControl] Erro ao atualizar o banco: {e}")
 
     def _monitor_loop(self):
         last_mtime = self.log_reader.get_modified_time()
@@ -100,10 +107,11 @@ class LogElevatorControl:
             try:
                 current_mtime = self.log_reader.get_modified_time()
                 if current_mtime != last_mtime:
+                    print(f"[LogElevatorControl] Mudança detectada no arquivo. Atualizando...")
                     last_mtime = current_mtime
                     self.atualizar_banco()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[LogElevatorControl] Erro na thread de monitoramento: {e}")
             time.sleep(2)
 
     def iniciar(self):
@@ -122,9 +130,10 @@ class LogIntegrationControl:
     """
     Controle projetado para monitorar um arquivo de log de integrações e atualizar no banco de dados.
     """
-    def __init__(self, file_path):
+    def __init__(self, file_path="C:/Solid Falcon/Local/Logs/IntegrationsLog.txt"):
+        self.path = os.getenv("PATH_LOG_INTEGRATION", file_path)
         self.db = SqlServer("thinkim")
-        self.log_reader = LogReader(file_path)
+        self.log_reader = LogReader(self.path)
         self.is_running = False
 
     def _parse_file_line(self, line):
@@ -193,6 +202,8 @@ class LogIntegrationControl:
             else:
                 novas_linhas = linhas[:match_index]
 
+            print(f"[LogIntegrationControl] Preparando inserção de {len(novas_linhas)} novas linhas no banco...")
+            linhas_inseridas = 0
             for linha in reversed(novas_linhas):
                 dh_str, evento, dados = self._parse_file_line(linha)
                 if dh_str:
@@ -201,11 +212,13 @@ class LogIntegrationControl:
                 else:
                     novo_log = LogIntegrations(dados=linha)
                 session.add(novo_log)
+                linhas_inseridas += 1
             session.commit()
+            print(f"[LogIntegrationControl] Concluído! {linhas_inseridas} registros salvos no banco de integrações.")
             session.close()
 
         except Exception as e:
-            print(f"Erro ao atualizar o banco de integrações: {e}")
+            print(f"[LogIntegrationControl] Erro ao atualizar o banco de integrações: {e}")
 
     def _monitor_loop(self):
         last_mtime = self.log_reader.get_modified_time()
@@ -213,10 +226,11 @@ class LogIntegrationControl:
             try:
                 current_mtime = self.log_reader.get_modified_time()
                 if current_mtime != last_mtime:
+                    print(f"[LogIntegrationControl] Mudança detectada no arquivo. Atualizando...")
                     last_mtime = current_mtime
                     self.atualizar_banco()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[LogIntegrationControl] Erro na thread de monitoramento: {e}")
             time.sleep(2)
 
     def iniciar(self):

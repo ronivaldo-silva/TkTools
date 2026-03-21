@@ -11,6 +11,7 @@ class Facial:
         self.firmware = None
         self.mac_address = None
         self.online = False
+        self._datahora = None
         
         self.isapi = HikvisionClient(ip, 'admin', '@ThinKim2020')
 
@@ -18,12 +19,14 @@ class Facial:
         """Atualiza os atributos da classe com informações do equipamento."""
         try:
             device_info = self.isapi.get_device_info()
+            if device_info:
+                print('Device Online')
+                self.online = True
+
         except Exception as e:
             self.online = False
             print(f"Error getting device info for {self.ip}: {e}")
             raise e
-        finally:
-            self.online = True
         
         try:
             user_info = self.isapi.get_user_info_count()
@@ -41,6 +44,17 @@ class Facial:
 
     def reboot(self):
         self.isapi.reboot_device()
+
+    def update_time(self):
+        """Coleta a data e hora do equipamento e armazena internamente."""
+        try:
+            time_data = self.isapi.get_system_time()
+            self._datahora = time_data.get('localTime')
+            return self._datahora
+        except Exception as e:
+            print(f"Error getting time for {self.ip}: {e}")
+            self._datahora = None
+            return None
 
     def get_people_count(self):
         self.pessoas = self.isapi.get_user_count()

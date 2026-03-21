@@ -7,11 +7,16 @@ class LogReader:
     def read_all_lines(self):
         """Lê e retorna as linhas do arquivo de texto."""
         if not os.path.exists(self.file_path):
+            print(f"[LogReader] Arquivo não encontrado: {self.file_path}")
             return []
         try:
+            print(f"[LogReader] Lendo as linhas do arquivo: {self.file_path}")
             with open(self.file_path, "r", encoding="utf-8") as f:
-                return [line.strip() for line in f.readlines() if line.strip()]
-        except Exception:
+                linhas = [line.strip() for line in f.readlines() if line.strip()]
+            print(f"[LogReader] {len(linhas)} linhas lidas com sucesso.")
+            return linhas
+        except Exception as e:
+            print(f"[LogReader] Erro ao ler arquivo {self.file_path}: {e}")
             return []
 
     def get_modified_time(self):
