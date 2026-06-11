@@ -29,7 +29,7 @@ class HikvisionClient:
         except requests.exceptions.ConnectionError:
             raise Exception("Offline")
         except requests.exceptions.HTTPError as e:
-             raise Exception(f"HTTP Error: {e.response.status_code}")
+             raise Exception(f"HTTP Error: {e.response.status_code} - Response: {e.response.text}")
         except Exception as e:
             raise Exception(str(e))
 
@@ -50,7 +50,7 @@ class HikvisionClient:
         except requests.exceptions.ConnectionError:
             raise Exception("Offline")
         except requests.exceptions.HTTPError as e:
-             raise Exception(f"HTTP Error: {e.response.status_code}")
+             raise Exception(f"HTTP Error: {e.response.status_code} - Response: {e.response.text}")
         except Exception as e:
             raise Exception(str(e))
 
@@ -148,6 +148,33 @@ class HikvisionClient:
             logging.error(f"Erro ao obter informacoes do dispositivo {self.ip}: {e}")
             raise e
 
+    def set_device_name(self, name: str):
+        """
+        Altera o nome do dispositivo.
+        Método HTTP: PUT
+        Endpoint: /ISAPI/System/deviceInfo?format=json
+        """
+        try:
+            # 1. Coleta os dados atuais em XML com GET
+            response_get = self._get_request("/ISAPI/System/deviceInfo")
+            xml_data = response_get.text
+            
+            # 2. Altera o campo <deviceName> com o nome novo
+            import re
+            novo_xml = re.sub(r'<deviceName>.*?</deviceName>', f'<deviceName>{name}</deviceName>', xml_data, flags=re.IGNORECASE | re.DOTALL)
+            
+            # Caso o equipamento retorne tag vazia como <deviceName/>
+            if '<deviceName/>' in novo_xml:
+                novo_xml = novo_xml.replace('<deviceName/>', f'<deviceName>{name}</deviceName>')
+            
+            # 3. Envia o XML atualizado como corpo em PUT
+            endpoint_put = "/ISAPI/System/deviceInfo"
+            response_put = self._put_request(endpoint_put, data=novo_xml)
+            return response_put.text
+        except Exception as e:
+            logging.error(f"Erro ao alterar nome do dispositivo {self.ip}: {e}")
+            raise e
+
     def get_access_groups(self, id:int = 1):
         """Lista todos os grupos de acesso via ISAPI e retorna uma lista de dicts."""
 
@@ -155,14 +182,26 @@ class HikvisionClient:
         
         return data.json()
 
-    def get_user_list(self, pagina:int = 1) -> dict:
+    def get_user_list(self, pagina:int = 1, max_results:int = 30, user_type:str = None, name:str = None, employee_ids:list = None, has_face:bool = None, has_card:bool = None) -> dict:
         try:
+            cond = {
+                "searchID": '1',
+                "maxResults": max_results,
+                "searchResultPosition": (pagina - 1) * max_results
+            }
+            if user_type:
+                cond["userType"] = user_type
+            if name:
+                cond["fuzzySearch"] = name
+            if has_face is not None:
+                cond["hasFace"] = bool(has_face)
+            if has_card is not None:
+                cond["hasCard"] = bool(has_card)
+            if employee_ids:
+                cond["EmployeeNoList"] = [{"employeeNo": str(eid)} for eid in employee_ids]
+
             payload = {
-                "UserInfoSearchCond": {
-                    "searchID": '1',
-                    "maxResults": 100,
-                    "searchResultPosition": (pagina -1) * 100
-                }
+                "UserInfoSearchCond": cond
             }
             response = self._get_request("/ISAPI/AccessControl/UserInfo/Search?format=json", json_data=payload)
             data = response.json()
@@ -222,7 +261,7 @@ class HikvisionClient:
             response = self.get_user_list(pagina)
             data = response
 
-            tabela = pd.DataFrame(data['UserInfoSearch']['UserInfo'])
+            tabela = None #pd.DataFrame(data['UserInfoSearch']['UserInfo'])
 
             tabela['RightPlan'] = tabela['RightPlan'].apply(lambda x: x[0]['planTemplateNo'])
             
@@ -430,29 +469,36 @@ class HikvisionClient:
                 
         return all_events
 
-    def set_advertising_mode(self, mode: str = "advertising", display_type: str = "full", popup_preview: bool = True):
+    def set_IdentityTerminal_showmode(self, showmode: str = "normal", display_type: str = "full", popup_preview: bool = True):
         """
         Configura o modo de exibição do terminal (IdentityTerminal).
-        :param mode: "normal", "concise", "advertising", "meeting", "selfDefine"
+        :param showmode: "normal", "concise", "advertising", "meeting", "selfDefine"
         :param display_type: "full" ou "split" (apenas para modo advertising)
         :param popup_preview: True/False (exibe janela de visualização)
         """
-        endpoint = "/ISAPI/AccessControl/IdentityTerminal?format=json"
-        
-        payload = {
-            "IdentityTerminal": {
-                "showMode": mode,
-                "advertisingDisplayType": display_type,
-                "popUpPreviewWindow": popup_preview
-            }
-        }
+        endpoint = "/ISAPI/AccessControl/IdentityTerminal"
         
         try:
-            # PUT request to update configuration
-            response = self._put_request(endpoint, json_data=payload)
-            return response.json()
+            # 1. Coleta os dados atuais em XML com GET
+            response_get = self._get_request(endpoint)
+            xml_data = response_get.text
+            
+            # 2. Altera o campo <showMode> com o novo modo
+            import re
+            novo_xml = re.sub(r'<showMode>.*?</showMode>', f'<showMode>{showmode}</showMode>', xml_data, flags=re.IGNORECASE | re.DOTALL)
+            
+            # Caso o equipamento retorne tag vazia como <showMode/>
+            if '<showMode/>' in novo_xml:
+                novo_xml = novo_xml.replace('<showMode/>', f'<showMode>{showmode}</showMode>')
+            
+            # Opcional: Alterar os demais campos se existirem no XML (popUpPreviewWindow e advertisingDisplayType)
+            # Para o scopo da instrução, garantimos a alteração do showMode acima
+            
+            # 3. Envia o XML atualizado como corpo em PUT
+            response_put = self._put_request(endpoint, data=novo_xml)
+            return response_put.text
         except Exception as e:
-            logging.error(f"Error setting advertising mode for {self.ip}: {e}")
+            logging.error(f"Erro ao configurar showMode no terminal {self.ip}: {e}")
             raise e
 
     def reboot_device(self):
@@ -811,6 +857,25 @@ class HikvisionClient:
             logging.error(f"Erro ao configurar KeyCfg do botão {key_id} no dispositivo {self.ip}: {e}")
             raise e
 
+    def create_user(self, employee_no: str, user_data: dict) -> dict:
+        """
+        Cria/insere um novo usuário no equipamento.
+        Método: POST
+        Endpoint: /ISAPI/AccessControl/UserInfo/Record?format=json
+        """
+        endpoint = "/ISAPI/AccessControl/UserInfo/Record?format=json"
+        user_data["employeeNo"] = str(employee_no)
+        payload = {"UserInfo": user_data}
+        try:
+            response = self._get_request(endpoint, json_data=payload)
+            data = response.json()
+            if str(data.get("statusCode", "1")) != "1":
+                raise Exception(f"Falha ao criar usuário ({employee_no}): {data.get('errorMsg', 'Erro desconhecido')} (Status: {data.get('statusCode')})")
+            return data
+        except Exception as e:
+            logging.error(f"Erro ao criar usuário {employee_no} no dispositivo {self.ip}: {e}")
+            raise e
+
     def edit_user(self, employee_no: str, user_data: dict) -> dict:
         """
         1. Alterar Usuário (Edit Person Information)
@@ -1027,4 +1092,114 @@ class HikvisionClient:
         except Exception as e:
             logging.error(f"Erro ao obter configuracoes de tempo do dispositivo {self.ip}: {e}")
             raise e
+
+    def set_user_card(self, employee_no: str, card_no: str, card_type: str = "normalCard") -> dict:
+        """
+        Insere/vincula um cartão a um usuário recém-criado.
+        Método: POST
+        Endpoint: /ISAPI/AccessControl/CardInfo/Record?format=json
+        """
+        endpoint = "/ISAPI/AccessControl/CardInfo/Record?format=json"
+        payload = {
+            "CardInfo": {
+                "employeeNo": str(employee_no),
+                "cardNo": str(card_no),
+                "cardType": card_type
+            }
+        }
+        try:
+            # Reutiliza o _get_request que faz o POST se passar json_data
+            response = self._get_request(endpoint, json_data=payload)
+            data = response.json()
+            if str(data.get("statusCode", "1")) != "1":
+                raise Exception(f"Falha ao cadastrar cartão ({card_no}) para usuário ({employee_no}): {data.get('errorMsg', 'Erro desconhecido')} (Status: {data.get('statusCode')})")
+            return data
+        except Exception as e:
+            logging.error(f"Erro ao vincular cartão {card_no} ao usuário {employee_no}: {e}")
+            raise e
+
+    def set_user_face_base64(self, employee_no: str, name: str, photo_b64: str, face_lib_type: str = "blackFD", fdid: str = "1") -> dict:
+        """
+        Envia a foto da face do usuário a partir de uma string Base64.
+
+        Decodifica o Base64 para bytes e realiza o envio via multipart/form-data:
+          - Part 'faceURL': JSON com metadados (faceLibType, FDID, FPID, name)
+          - Part 'img': bytes binários do JPEG
+
+        Método: POST
+        Endpoint: /ISAPI/Intelligent/FDLib/FaceDataRecord?format=json
+        """
+        import base64 as _b64
+        import json as _json
+        from requests.auth import HTTPDigestAuth
+
+        try:
+            photo_bytes = _b64.b64decode(photo_b64)
+        except Exception as e:
+            raise ValueError(f"Falha ao decodificar imagem base64 para usuário {employee_no}: {e}")
+
+        url = f"{self.base_url}/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json"
+
+        face_meta = {
+            "faceLibType": face_lib_type,
+            "FDID": fdid,
+            "FPID": str(employee_no),
+            "name": name
+        }
+
+        files = {
+            "faceURL": (None, _json.dumps(face_meta), "application/json"),
+            "img": ("face.jpg", photo_bytes, "image/jpeg")
+        }
+
+        try:
+            resp = requests.post(
+                url,
+                auth=HTTPDigestAuth(self.username, self.password),
+                files=files,
+                timeout=self.timeout
+            )
+            if resp.ok:
+                return resp.json()
+            raise Exception(f"HTTP Error: {resp.status_code} - Response: {resp.text}")
+        except Exception as e:
+            logging.error(f"Erro ao cadastrar face para usuário {employee_no}: {e}")
+            raise e
+
+    def set_user_face_multipart(self, employee_no: str, photo_bytes: bytes, face_lib_type: str = "blackFD", fdid: str = "1") -> dict:
+        """
+        Envia a foto da face do usuário usando formato multipart/form-data.
+        Método: POST
+        Endpoint: /ISAPI/Intelligent/FDLib/FaceDataRecord?format=json
+        """
+        url = f"{self.base_url}/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json"
+        
+        # Parte 1 (Dados do usuário): faceURL
+        face_url_json = {
+            "faceLibType": face_lib_type,
+            "FDID": fdid,
+            "FPID": str(employee_no)
+        }
+        
+        # Constrói o multipart
+        import json
+        files = {
+            "faceURL": (None, json.dumps(face_url_json), "application/json"),
+            "img": ("face.jpg", photo_bytes, "image/jpeg")
+        }
+        
+        try:
+            from requests.auth import HTTPDigestAuth
+            response = requests.post(
+                url, 
+                auth=HTTPDigestAuth(self.username, self.password), 
+                files=files, 
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logging.error(f"Erro ao cadastrar face multipart para usuário {employee_no}: {e}")
+            raise e
+
 

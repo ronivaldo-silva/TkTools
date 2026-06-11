@@ -44,6 +44,7 @@ class EntityIdentifier(FalconBase):
     __tablename__ = 'entityidentifier'
     __table_args__ = {'schema': 'dbo'}
 
+    EntityIdentifierId: Mapped[int] = mapped_column(Integer, primary_key=True)
     EntityEntityId: Mapped[int] = mapped_column(Integer, ForeignKey("dbo.entity.EntityId"), primary_key=True)
 
 # ---- Banco de Dados: THINKIM ----
@@ -60,6 +61,7 @@ class UsuariosFaciais(ThinkimBase):
     doorRight: Mapped[Optional[str]] = mapped_column(String(50))
     numOfCard: Mapped[Optional[int]] = mapped_column(Integer)
     numOfFace: Mapped[Optional[int]] = mapped_column(Integer)
+    category: Mapped[Optional[str]] = mapped_column(String(50)) # OK, Normalize, Delete
 
 class LogElevators(ThinkimBase):
     __tablename__ = 'log_elevators'
@@ -75,3 +77,35 @@ class LogIntegrations(ThinkimBase):
     datahora: Mapped[Optional[datetime]] = mapped_column(DateTime)
     evento: Mapped[Optional[str]] = mapped_column(String(255))
     dados: Mapped[str] = mapped_column(String)
+
+class EntityPrecess(ThinkimBase):
+    """
+    Tabela entity_precess contendo os dados principais para cadastro nos Faciais Hikvision.
+    Inclui os parâmetros equivalentes e a imagem em base64 do usuário.
+    """
+    __tablename__ = 'entity_precess'
+
+    employeeNo: Mapped[str] = mapped_column(String(50), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    userType: Mapped[str] = mapped_column(String(50), default="normal")
+    beginTime: Mapped[datetime] = mapped_column(DateTime)
+    endTime: Mapped[datetime] = mapped_column(DateTime)
+    doorRight: Mapped[str] = mapped_column(String(50), default="1")
+    userVerifyMode: Mapped[str] = mapped_column(String(50), default="face")
+    password: Mapped[Optional[str]] = mapped_column(String(50), default="")
+    photo: Mapped[Optional[str]] = mapped_column(String) # Imagem base64 do usuário
+
+# ---- Banco de Dados: SQLITE ----
+
+class SqliteBase(DeclarativeBase):
+    pass
+
+class Camera(SqliteBase):
+    __tablename__ = 'cameras'
+
+    ip: Mapped[str] = mapped_column(String(50), primary_key=True)
+    nome: Mapped[str] = mapped_column(String(255))
+    user: Mapped[str] = mapped_column(String(100))
+    password: Mapped[str] = mapped_column(String(100))
+    serial_number: Mapped[str] = mapped_column(String(50))
+    mac: Mapped[str] = mapped_column(String(50))

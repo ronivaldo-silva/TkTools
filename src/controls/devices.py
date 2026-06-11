@@ -1,4 +1,12 @@
+import os
+from dotenv import load_dotenv
 from models.hikvision_isapi import HikvisionClient
+
+load_dotenv()
+
+# Credenciais Hikvision lidas do .env (HIK_USER / HIK_PASS)
+_HIK_USER = os.getenv("HIK_USER", "admin").strip("'\"")
+_HIK_PASS = os.getenv("HIK_PASS", "@ThinKim2020").strip("'\"")
 
 class Facial:
     def __init__(self, nome, ip):
@@ -12,8 +20,8 @@ class Facial:
         self.mac_address = None
         self.online = False
         self._datahora = None
-        
-        self.isapi = HikvisionClient(ip, 'admin', '@ThinKim2020')
+
+        self.isapi = HikvisionClient(ip, _HIK_USER, _HIK_PASS)
 
     def load_info(self):
         """Atualiza os atributos da classe com informações do equipamento."""
@@ -62,6 +70,9 @@ class Facial:
     
     def get_device_info(self):
         return self.isapi.get_device_info()
+    
+    def set_device_name(self, name: str):
+        return self.isapi.set_device_name(name)
     
     def delete_all_users(self):
         self.isapi.delete_users(mode="all")
